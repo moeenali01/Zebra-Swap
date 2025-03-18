@@ -16,15 +16,12 @@ contract CounterScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        
         customtoken = new CustomDex();
         console.log("Custom Token Contract deployed at:", address(swap1));
 
-        
         swap1 = new ZebraLiquidityNFT();
         console.log("swap 1.0 deployed at:", address(swap1));
 
-        
         swap2 = new Swap();
         console.log("swap 2.0 deployed at:", address(swap2));
 
