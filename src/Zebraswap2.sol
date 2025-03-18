@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable2Step.sol";
 
-
 // Interfaces for ERC20 token and Router
 interface IERC20 {
     function totalSupply() external view returns (uint256);
@@ -12,19 +11,31 @@ interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
     function allowance(address owner, address spender) external view returns (uint256);
-
 }
 
 interface IUniswapV2Router {
-    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
-    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts);
-    function swapTokensForExactETH(uint amountOut, uint amountInMax, address[] calldata path, address to, uint deadline)
+    function getAmountsOut(uint256 amountIn, address[] calldata path)
         external
-        returns (uint[] memory amounts);
-    function swapETHForExactTokens(uint amountOut, address[] calldata path, address to, uint deadline)
+        view
+        returns (uint256[] memory amounts);
+    function swapExactTokensForTokens(
+        uint256 amountIn,
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+    function swapTokensForExactETH(
+        uint256 amountOut,
+        uint256 amountInMax,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external returns (uint256[] memory amounts);
+    function swapETHForExactTokens(uint256 amountOut, address[] calldata path, address to, uint256 deadline)
         external
         payable
-        returns (uint[] memory amounts);
+        returns (uint256[] memory amounts);
 }
 
 interface IWETH {
@@ -32,11 +43,8 @@ interface IWETH {
     function withdraw(uint256 amount) external;
 }
 
-
-
-
-contract Swap  {
-    IUniswapV2Router public router;  // Wanswap router address
+contract Swap {
+    IUniswapV2Router public router; // Wanswap router address
     address public owner;
     uint256 public feePercentage;
     address public w_wan;
@@ -55,8 +63,7 @@ contract Swap  {
     }
 
     // Set the Wanswap router address
-    constructor()  {
-
+    constructor() {
         router = IUniswapV2Router(address(0xEd34EE41cA84042b619E9AEBF6175bB4a0069a05)); //wan main
         w_wan = address(0xA7Df470a490197Af8fdD72bDB40a68709266027b);
         owner = msg.sender;
@@ -80,19 +87,16 @@ contract Swap  {
         emit OwnerChanged(owner, newOwner);
         owner = newOwner;
     }
-    
+
     // function proposeNewOwner(address newOwner) external onlyOwner {
     // transferOwnership(newOwner);  // Propose the new owner
     // }
-
-
 
     function setFeePercentage(uint256 newFee) external onlyOwner {
         require(newFee <= 1000, "Fee cannot exceed 10%");
         emit FeeUpdated(feePercentage, newFee);
         feePercentage = newFee;
     }
-
 
     function getBestOutputs(address fromToken, address toToken, uint256 amountIn) public view returns (uint256) {
         require(amountIn > 0, "AmountIn must be greater than 0");
@@ -112,25 +116,22 @@ contract Swap  {
         }
     }
 
-    
-
-    function swapTokens(address fromToken, 
-        address toToken, 
+    function swapTokens(
+        address fromToken,
+        address toToken,
         uint256 amountIn,
         uint256 minAmount // Minimum acceptable amount of toToken to receive
-
     ) external {
         require(IERC20(fromToken).balanceOf(msg.sender) >= amountIn, "Insufficient balance");
 
         uint256 fee = (amountIn * feePercentage) / 10000;
         uint256 amountAfterFee = amountIn - fee;
 
-        
         // Calculate the minimum output using getBestOutputs
         uint256 amountOutMin = getBestOutputs(fromToken, toToken, amountAfterFee);
         require(amountOutMin > 0, "Calculated output is invalid");
         require(amountOutMin >= minAmount, "Calculated output is too low");
-         // Check if the token has a fee-on-transfer mechanism
+        // Check if the token has a fee-on-transfer mechanism
         uint256 initialBalance = IERC20(fromToken).balanceOf(address(this));
         require(IERC20(fromToken).transferFrom(msg.sender, address(this), amountIn), "Transfer failed");
 
@@ -149,17 +150,17 @@ contract Swap  {
         // Approve the router to spend the tokens
         require(IERC20(fromToken).approve(address(router), amountAfterFee), "Router approve failed");
         // Check the current allowance for the router
-    uint256 currentAllowance = IERC20(fromToken).allowance(address(this), address(router));
+        uint256 currentAllowance = IERC20(fromToken).allowance(address(this), address(router));
 
-    // If the allowance is less than the amount needed, approve the router
-    if (currentAllowance < amountAfterFee) {
-        // For safe approval, set the allowance to 0 first, then to the new amount
-        require(IERC20(fromToken).approve(address(router), 0), "Failed to reset allowance");
-        require(IERC20(fromToken).approve(address(router), amountAfterFee), "Router approve failed");
-    }
+        // If the allowance is less than the amount needed, approve the router
+        if (currentAllowance < amountAfterFee) {
+            // For safe approval, set the allowance to 0 first, then to the new amount
+            require(IERC20(fromToken).approve(address(router), 0), "Failed to reset allowance");
+            require(IERC20(fromToken).approve(address(router), amountAfterFee), "Router approve failed");
+        }
 
         // Set up the path for the swap (fromToken -> toToken)
-        address[] memory path = new address[](2);  // Initialize the path array with 2 elements
+        address[] memory path = new address[](2); // Initialize the path array with 2 elements
         path[0] = fromToken;
         path[1] = toToken;
 
@@ -172,39 +173,27 @@ contract Swap  {
         }
     }
 
-
     function swapWANToToken(address toToken) external payable {
-            require(toToken != address(0), "Invalid token address");
-            require(msg.value > 0, "No WAN sent");
+        require(toToken != address(0), "Invalid token address");
+        require(msg.value > 0, "No WAN sent");
 
+        uint256 fee = (msg.value * feePercentage) / 10000;
+        uint256 amountAfterFee = msg.value - fee;
 
-            uint256 fee = (msg.value * feePercentage) / 10000;
-            uint256 amountAfterFee = msg.value - fee;
+        IWETH(w_wan).deposit{value: amountAfterFee}();
+        payable(owner).transfer(fee);
+        emit FeeCollected(owner, fee);
 
-            IWETH(w_wan).deposit{value: amountAfterFee}();
-            payable(owner).transfer(fee);
-            emit FeeCollected(owner, fee);
+        uint256 amountOutMin = getBestOutputs(w_wan, toToken, amountAfterFee);
+        require(amountOutMin > 0, "Calculated output is invalid");
 
-            uint256 amountOutMin = getBestOutputs(w_wan, toToken, amountAfterFee);
-            require(amountOutMin > 0, "Calculated output is invalid");
+        address[] memory _path = new address[](2); // Initialize the path array with 2 elements
+        _path[0] = w_wan;
+        _path[1] = toToken;
 
-            address[] memory _path = new address[](2);  // Initialize the path array with 2 elements
-            _path[0] = w_wan;
-            _path[1] = toToken;
+        IERC20(w_wan).approve(address(router), amountAfterFee);
 
-
-            IERC20(w_wan).approve(address(router),amountAfterFee);
-
-        
-            router.swapExactTokensForTokens(
-                amountAfterFee, 
-                amountOutMin, 
-                _path, 
-                msg.sender, 
-                block.timestamp + 300 
-            );
-            emit SwapExecuted(address(0), toToken, msg.value, amountOutMin);
+        router.swapExactTokensForTokens(amountAfterFee, amountOutMin, _path, msg.sender, block.timestamp + 300);
+        emit SwapExecuted(address(0), toToken, msg.value, amountOutMin);
     }
-    
-
 }

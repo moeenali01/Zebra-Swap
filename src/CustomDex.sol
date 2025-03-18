@@ -6,18 +6,15 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+contract CustomToken is ERC20, Ownable {
+    uint256 public constant MAX_SUPPLY = 1000000 * 10 ** 18; // Maximum supply of 1M tokens
 
-
-
-contract CustomToken is ERC20 , Ownable {
-        uint256 public constant MAX_SUPPLY = 1000000 * 10 ** 18; // Maximum supply of 1M tokens
-
-    constructor(string memory name, string memory symbol)  ERC20(name, symbol) Ownable(msg.sender) {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) Ownable(msg.sender) {
         // Only mint the initial supply once, and only to the owner
         _mint(msg.sender, 1000000 * 10 ** 18);
     }
-     
-     // Function to mint additional tokens (only callable by the owner)
+
+    // Function to mint additional tokens (only callable by the owner)
     function mint(address to, uint256 amount) external onlyOwner {
         require(totalSupply() + amount <= MAX_SUPPLY, "ERC20: minting exceeds max supply");
         _mint(to, amount);
@@ -25,7 +22,6 @@ contract CustomToken is ERC20 , Ownable {
 }
 
 contract CustomDex is ReentrancyGuard {
-
     using SafeERC20 for IERC20;
 
     // Custom tokens to be initialized
@@ -57,28 +53,19 @@ contract CustomDex is ReentrancyGuard {
         }
     }
 
-    function getBalance(
-        string memory tokenName,
-        address _address
-    ) public view returns (uint256) {
+    function getBalance(string memory tokenName, address _address) public view returns (uint256) {
         return tokenInstanceMap[tokenName].balanceOf(_address);
     }
 
-    function getTotalSupply(
-        string memory tokenName
-    ) public view returns (uint256) {
+    function getTotalSupply(string memory tokenName) public view returns (uint256) {
         return tokenInstanceMap[tokenName].totalSupply();
     }
 
-    function getName(
-        string memory tokenName
-    ) public view returns (string memory) {
+    function getName(string memory tokenName) public view returns (string memory) {
         return tokenInstanceMap[tokenName].name();
     }
 
-    function getTokenAddress(
-        string memory tokenName
-    ) public view returns (address) {
+    function getTokenAddress(string memory tokenName) public view returns (address) {
         return address(tokenInstanceMap[tokenName]);
     }
 
@@ -104,31 +91,25 @@ contract CustomDex is ReentrancyGuard {
     }
 
     // native to any token
-    function swapEthToToken(
-        string memory tokenName,
-        uint256 minOutputValue
-    ) public payable returns (uint256) {
-           
-            // Token existence check
+    function swapEthToToken(string memory tokenName, uint256 minOutputValue) public payable returns (uint256) {
+        // Token existence check
         require(address(tokenInstanceMap[tokenName]) != address(0), "Token does not exist");
-
-        
 
         uint256 inputValue = msg.value;
         uint256 outputValue = (inputValue / ethValue) * 10 ** 18;
 
         // Slippage protection: Ensure output is at least minOutputValue
-    require(outputValue >= minOutputValue, "Slippage too high, output less than min");
+        require(outputValue >= minOutputValue, "Slippage too high, output less than min");
 
         // Check if the contract has enough tokens to fulfill the swap
-    uint256 tokenBalance = tokenInstanceMap[tokenName].balanceOf(address(this));
-    require(tokenBalance >= outputValue, "Insufficient balance in contract to complete swap");
+        uint256 tokenBalance = tokenInstanceMap[tokenName].balanceOf(address(this));
+        require(tokenBalance >= outputValue, "Insufficient balance in contract to complete swap");
 
         // require(
         //     tokenInstanceMap[tokenName].transfer(msg.sender, outputValue),
         //     "Transfer failed"
         // );
-           // Safe transfer to the user
+        // Safe transfer to the user
         IERC20 token = IERC20(address(tokenInstanceMap[tokenName]));
         token.safeTransfer(msg.sender, outputValue);
 
@@ -137,33 +118,27 @@ contract CustomDex is ReentrancyGuard {
         return outputValue;
     }
 
-    function swapTokenToEth(
-        string memory tokenName,
-        uint256 _amount,
-        uint256 minOutputValue
-    ) public nonReentrant returns (uint256)  {
-           
-            // Token existence check
+    function swapTokenToEth(string memory tokenName, uint256 _amount, uint256 minOutputValue)
+        public
+        nonReentrant
+        returns (uint256)
+    {
+        // Token existence check
         require(address(tokenInstanceMap[tokenName]) != address(0), "Token does not exist");
 
-        
         // Ensure correct precision by keeping full decimals
-    uint256 exactAmount = _amount;
-    uint256 ethToBeTransfered = (exactAmount * ethValue) / 10 ** 18;
+        uint256 exactAmount = _amount;
+        uint256 ethToBeTransfered = (exactAmount * ethValue) / 10 ** 18;
 
         // Slippage protection: Ensure output is at least minOutputValue
         require(ethToBeTransfered >= minOutputValue, "Slippage too high, output less than min");
 
-        require(
-            address(this).balance >= ethToBeTransfered,
-            "Dex is running low on balance"
-        );
+        require(address(this).balance >= ethToBeTransfered, "Dex is running low on balance");
 
         // Check the approval for transferFrom
-    IERC20 token = IERC20(address(tokenInstanceMap[tokenName]));
-    uint256 allowance = token.allowance(msg.sender, address(this));
-    require(allowance >= _amount, "Allowance is not enough for the transfer");
-
+        IERC20 token = IERC20(address(tokenInstanceMap[tokenName]));
+        uint256 allowance = token.allowance(msg.sender, address(this));
+        require(allowance >= _amount, "Allowance is not enough for the transfer");
 
         // Update contract state before external interaction (checks-effects-interactions)
 
@@ -186,17 +161,11 @@ contract CustomDex is ReentrancyGuard {
 
         string memory etherToken = "Ether";
 
-        _transactionHistory(
-            tokenName,
-            etherToken,
-            exactAmount,
-            ethToBeTransfered
-        );
+        _transactionHistory(tokenName, etherToken, exactAmount, ethToBeTransfered);
         return ethToBeTransfered;
     }
 
-
-    //We'll calculate the output value based on the ratio of the source and destination token balances in the contract, 
+    //We'll calculate the output value based on the ratio of the source and destination token balances in the contract,
     //ensuring that the value exchanged respects the current liquidity and preventing arbitrage.
 
     function swapTokenToToken(
@@ -204,12 +173,10 @@ contract CustomDex is ReentrancyGuard {
         string memory destTokenName,
         uint256 _amount,
         uint256 minOutputValue
-
     ) public nonReentrant {
-
         // Token existence checks
-    require(address(tokenInstanceMap[srcTokenName]) != address(0), "Source token does not exist");
-    require(address(tokenInstanceMap[destTokenName]) != address(0), "Destination token does not exist");
+        require(address(tokenInstanceMap[srcTokenName]) != address(0), "Source token does not exist");
+        require(address(tokenInstanceMap[destTokenName]) != address(0), "Destination token does not exist");
 
         // Transfer the source token from the user to the contract
 
@@ -225,22 +192,21 @@ contract CustomDex is ReentrancyGuard {
         IERC20 srcToken = IERC20(address(tokenInstanceMap[srcTokenName]));
         srcToken.safeTransferFrom(msg.sender, address(this), _amount);
 
-         // Get the contract's current balances of source and destination tokens
-    uint256 srcTokenBalance = tokenInstanceMap[srcTokenName].balanceOf(address(this));
-    uint256 destTokenBalance = tokenInstanceMap[destTokenName].balanceOf(address(this));
+        // Get the contract's current balances of source and destination tokens
+        uint256 srcTokenBalance = tokenInstanceMap[srcTokenName].balanceOf(address(this));
+        uint256 destTokenBalance = tokenInstanceMap[destTokenName].balanceOf(address(this));
 
-     // Calculate the output value based on the current ratio of the token balances
-    uint256 outputValue = (_amount * destTokenBalance) / srcTokenBalance;
+        // Calculate the output value based on the current ratio of the token balances
+        uint256 outputValue = (_amount * destTokenBalance) / srcTokenBalance;
 
-
-         // Slippage protection: Ensure output is at least minOutputValue
-    require(outputValue >= minOutputValue, "Slippage too high, output less than min");
+        // Slippage protection: Ensure output is at least minOutputValue
+        require(outputValue >= minOutputValue, "Slippage too high, output less than min");
 
         // require(
         //     tokenInstanceMap[destTokenName].transfer(msg.sender, outputValue),
         //     "Transfer failed"
         // );
-          // Transfer the destination token to the user
+        // Transfer the destination token to the user
         IERC20 destToken = IERC20(address(tokenInstanceMap[destTokenName]));
         destToken.safeTransfer(msg.sender, outputValue);
 
@@ -253,7 +219,7 @@ contract CustomDex is ReentrancyGuard {
 
         History[] memory items = new History[](itemCount);
         for (uint256 i = 0; i < itemCount; i++) {
-            uint currentId = i + 1;
+            uint256 currentId = i + 1;
             History storage currentItem = historys[currentId];
             items[currentIndex] = currentItem;
             currentIndex += 1;

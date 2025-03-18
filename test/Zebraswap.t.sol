@@ -7,7 +7,5 @@ import "../src/CustomDex.sol";
 contract swapTest is Test {
     CustomDex public token;
 
-    function setUp() public {
-       
-}
+    function setUp() public {}
 }
